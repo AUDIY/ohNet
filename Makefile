@@ -156,7 +156,7 @@ dotnetFramework = net6.0
 
 ifeq ($(openhome_system),Linux)
 	#dotnetsdk = ~/.dotnet/dotnet
-	dotnetsdk = usr/bin/dotnet
+	dotnetsdk = /usr/bin/dotnet
 endif
 
 
