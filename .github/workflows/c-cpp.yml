@@ -16,8 +16,8 @@ jobs:
     - name: add repository
       run: sudo add-apt-repository ppa:dotnet/backports
     - name: install dependencies
-      run: sudo apt install -y dotnet-sdk-9.0 openjdk-8-jdk python-is-python3
+      run: sudo apt install -y openjdk-8-jdk python-is-python3 mono-devel
     - name: make
       run: make
     - name: make install
-      run: make install-libs install-includes
+      run: make install
