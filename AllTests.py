@@ -13,10 +13,14 @@ def objPath():
     elif platform.system() == 'Darwin':
         if gMac64 == 1:
             plat = 'Mac-x64'
+        elif gMacArm64 == 1:
+            plat = 'Mac-arm64'
         elif giOsArm64 == 1:
             plat = 'iOs-arm64'
         elif giOsx64 == 1:
             plat = 'iOs-x64'
+        elif giOsArm64Sim == 1:
+            plat = 'iOs-arm64'
     variant = 'Release'
     if gDebugBuild == 1:
         variant = 'Debug'
@@ -29,14 +33,18 @@ def buildArgs():
     if gDebugBuild == 1:
         buildArgs += ' debug=1'
     if gMac64 == 1:
-        buildArgs += ' mac-64=1'
+        buildArgs += ' Mac-x64=1'
+    if gMacArm64 == 1:
+        buildArgs += ' Mac-arm64=1'
     if giOsArm64 == 1:
         buildArgs += ' iOs-arm64=1'
     if giOsx64 == 1:
         buildArgs += ' iOs-x64=1'
+    if giOsArm64Sim == 1:
+        buildArgs += ' iOS-arm64-sim=1'
     if gAndroid == 1:
         buildArgs += ' Android-anycpu=1'
-    if gCore == 1 or gQnap == 1:
+    if gCore == 1:
         buildArgs += ' platform=' + gPlatform
     if gNativeBuildsOnly == 1:
         buildArgs += ' native_only=yes'
@@ -49,9 +57,6 @@ def build(aTarget, aParallel=False):
     if os.name == 'nt':
         buildCmd = 'nmake -s -f OhNet.mak '
     buildCmd += aTarget
-    if platform.system() == 'Darwin':
-        # No C++11 support on standard Mac build slaves
-        buildCmd += ' nocpp11=yes'
     if 'CS_PLATFORM' in os.environ:
         buildCmd += ' csplatform=' + os.environ['CS_PLATFORM']
     buildCmd += buildArgs()
@@ -193,10 +198,11 @@ gRunJavaTests = 0
 gJsTests = 0
 gDebugBuild = 0
 gMac64 = 0
+gMacArm64 = 0
 giOsArm64 = 0
 giOsx64 = 0
+giOsArm64Sim = 0
 gAndroid = 0
-gQnap = 0
 try:
     gPlatform = os.environ['PLATFORM']
 except KeyError:
@@ -239,6 +245,11 @@ for arg in sys.argv[1:]:
         if platform.system() != 'Darwin':
             print('ERROR - --mac-64 only applicable on Darwin')
             sys.exit(1)
+    elif arg == '--mac-arm64':
+        gMacArm64 = 1
+        if platform.system() != 'Darwin':
+            print('ERROR - --mac-arm64 only applicable on Darwin')
+            sys.exit(1)
     elif arg == '--iOs-arm64':
         giOsArm64 = 1
         if platform.system() != 'Darwin':
@@ -249,14 +260,17 @@ for arg in sys.argv[1:]:
         if platform.system() != 'Darwin':
             print('ERROR - --iOs-x64 only applicable on Darwin')
             sys.exit(1)
+    elif arg == '--iOs-arm64-sim':
+        giOsArm64Sim = 1
+        if platform.system() != 'Darwin':
+            print('ERROR - --iOs-x64 only applicable on Darwin')
+            sys.exit(1)
     elif arg == '--parallel':
         gParallel = True
     elif arg == '--core':
         gCore = 1
     elif arg == '--Android-anycpu':
         gAndroid = 1
-    elif arg == '--qnap':
-        gQnap = 1;
     else:
         print('Unrecognised argument - ', arg)
         sys.exit(1)

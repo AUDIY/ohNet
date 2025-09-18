@@ -116,7 +116,7 @@ class JenkinsBuild():
 
         parser = OptionParser()
         parser.add_option("-p", "--platform", dest="platform",
-            help="Linux-x86, Linux-x64, Windows-x86, Windows-x64, Linux-ARM, Linux-armhf, Linux-mipsel, Linux-ppc32, Linux-rpi, Mac-x64, Core-ppc32, Core-armv6, iOs-arm64, iOs-x64, Qnap-x86, Qnap-x19")
+            help="Linux-x86, Linux-x64, Windows-x86, Windows-x64, Linux-ARM, Linux-armhf, Linux-mipsel, Linux-ppc32, Linux-rpi, Mac-x64, Core-ppc32, Core-armv6, iOs-arm64, iOs-x64")
         parser.add_option("-n", "--nightly",
                   action="store_true", dest="nightly", default=False,
                   help="Perform a nightly build")
@@ -157,19 +157,20 @@ class JenkinsBuild():
             'Windows-x64': { 'os': 'windows', 'arch': 'x64', 'publish': True, 'system': 'Windows'},
             'Macos-x64': { 'os': 'macos', 'arch': 'x86', 'publish': False, 'system': 'Mac'},  # Old Jenkins label
             'Mac-x64': { 'os': 'macos', 'arch': 'x64', 'publish': True, 'system': 'Mac'},     # New Jenkins label, matches downstream builds
-            'Linux-ARM': { 'os': 'linux', 'arch': 'armel', 'publish': True, 'system': 'Linux'},
-            'Linux-armhf': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux'},
-            'Linux-rpi': { 'os': 'linux', 'arch': 'rpi', 'publish': True, 'system': 'Linux'},
+            'Mac-arm64': { 'os': 'macos', 'arch': 'arm64', 'publish': True, 'system': 'Mac'},     # New Jenkins label, matches downstream builds
+            'armhf-buildroot-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'buildroot'},
+            'armhf-raspbian-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'raspbian'},
+            'armhf-kirkstone-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'kirkstone'},
+            'armhf-scarthgap-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'scarthgap'},
+            'aarch64-kirkstone-linux': { 'os': 'linux', 'arch': 'aarch64', 'publish': True, 'system': 'Linux', 'distro': 'kirkstone'},
+            'aarch64-scarthgap-linux': { 'os': 'linux', 'arch': 'aarch64', 'publish': True, 'system': 'Linux', 'distro': 'scarthgap'},
             'Linux-mipsel': { 'os': 'linux', 'arch': 'mipsel', 'publish': True, 'system': 'Linux'},
-            'Linux-arm64': { 'os': 'linux', 'arch': 'arm64', 'publish': True, 'system': 'Linux'}, # TODO: delete this? what system was this intended for?
-            'Linux-aarch64': { 'os': 'linux', 'arch': 'aarch64', 'publish': True, 'system': 'Linux'},
             'iOs-x64': { 'os': 'iOs', 'arch': 'x64', 'publish': True, 'system': 'iOs'},
             'iOs-arm64': { 'os': 'iOs', 'arch': 'arm64', 'publish': True, 'system': 'iOs'},
+            'iOs-arm64-sim': { 'os': 'iOs', 'arch': 'arm64-sim', 'publish': True, 'system': 'iOs'},
             'Core-ppc32': { 'os': 'Core', 'arch': 'ppc32', 'publish': True, 'system': 'Core'},
             'Core-armv6': { 'os': 'Core', 'arch': 'armv6', 'publish': True, 'system': 'Core'},
             'Android-anycpu': { 'os': 'Android', 'arch': 'anycpu', 'publish': True, 'system': 'Android'},
-            'Qnap-x86': { 'os': 'Qnap', 'arch': 'x86', 'publish': True, 'system': 'Qnap'},
-            'Qnap-x19': {'os': 'Qnap', 'arch': 'x19', 'publish': True, 'system': 'Qnap'}
         }
         current_platform = self.options.platform
         self.platform = platforms[current_platform]
@@ -216,13 +217,21 @@ class JenkinsBuild():
             args.append('C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\VC\\Auxiliary\\Build\\vcvarsall.bat')
             args.append('amd64')
             os.environ['CS_PLATFORM'] = 'x64'
-        if os_platform == 'linux' and arch == 'armel':
-            os.environ['CROSS_COMPILE'] = '/usr/local/arm-2011.09/bin/arm-none-linux-gnueabi-'
-        if os_platform == 'linux' and arch == 'armhf':
-            if os.environ['LEGACY_BUILD'].lower() in ['true', 'yes', '1']:
-                # os.environ['CROSS_COMPILE'] = '/opt/gcc-linaro-5.3.1-2016.05-i686_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-'
-                os.environ['CROSS_COMPILE'] = '/opt/gcc-linaro-7.3.1-2018.05-i686_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-'
-            else:
+
+
+        
+        if arch in ['armhf', 'aarch64', 'riscv64'] and 'distro' in self.platform:
+            distro = self.platform['distro']
+            os.environ["openhome_distro"] = distro
+            if distro in ['kirkstone', 'scarthgap']:
+                toolchain_arch = {
+                    'armhf': 'cortexa9t2hf-neon-poky-linux-gnueabi',
+                    'aarch64': 'armv8a-poky-linux',
+                }
+                distro_version = {
+                    'kirkstone': '5.15-kirkstone',
+                    'scarthgap': '6.6-scarthgap',
+                }  
                 # get built SDK from our AWS storage
                 # print("working dir is " + os.getcwd())
                 # print("running as " + os.getlogin())
@@ -237,7 +246,7 @@ class JenkinsBuild():
                 # subprocess.check_output(fetched_path + " -y -d /home/hudson-smarties/linn-fb/5.15-kirkstone", shell=True)
 
                 # Parse yocto environment file, set up for build
-                env_string = subprocess.check_output(". /opt/linn-wayland/5.15-kirkstone/environment-setup-cortexa9t2hf-neon-poky-linux-gnueabi && env", shell=True)
+                env_string = subprocess.check_output(". /opt/linn-wayland/%s/environment-setup-%s && env" % (distro_version[distro], toolchain_arch[arch]), shell=True)
                 for el in env_string.decode("utf-8").split("\n"):
                     if "=" in el:
                         os.environ[el.split("=")[0]] = el.split("=", 1)[1]
@@ -245,20 +254,13 @@ class JenkinsBuild():
                     os.environ["CFLAGS"] = " ".join(os.environ["CC"].split(" ")[1:])
                 if os.environ.get("CXX", None):
                     os.environ["CXXFLAGS"] = " ".join(os.environ["CXX"].split(" ")[1:])
-                os.environ["LDFLAGS"] = '--sysroot=%s' % os.environ["SDKTARGETSYSROOT"]
-        if os_platform == 'linux' and arch == 'aarch64':
-            # Parse yocto environment file, set up for build
-            env_string = subprocess.check_output(". /opt/linn-wayland/5.15-kirkstone/environment-setup-armv8a-poky-linux && env", shell=True)
-            for el in env_string.decode("utf-8").split("\n"):
-                if "=" in el:
-                    os.environ[el.split("=")[0]] = el.split("=", 1)[1]
-            if os.environ.get("CC", None):
-                os.environ["CFLAGS"] = " ".join(os.environ["CC"].split(" ")[1:])
-            if os.environ.get("CXX", None):
-                os.environ["CXXFLAGS"] = " ".join(os.environ["CXX"].split(" ")[1:])
-            os.environ["LDFLAGS"] = '--sysroot=%s' % os.environ["SDKTARGETSYSROOT"]
-        if os_platform == 'linux' and arch == 'rpi':
-            os.environ['CROSS_COMPILE'] = '/opt/gcc-linaro-arm-linux-gnueabihf-raspbian-x64/bin/arm-linux-gnueabihf-'
+                os.environ["LDFLAGS"] = '--sysroot=%s' % os.environ["SDKTARGETSYSROOT"]               
+            elif distro in ['buildroot']:
+                # use pre-installed linaro toolchain
+                # os.environ['CROSS_COMPILE'] = '/opt/gcc-linaro-5.3.1-2016.05-i686_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-'
+                os.environ['CROSS_COMPILE'] = '/opt/gcc-linaro-7.3.1-2018.05-i686_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-'
+            elif distro in ['raspbian']:
+               os.environ['CROSS_COMPILE'] = '/opt/gcc-linaro-arm-linux-gnueabihf-raspbian-x64/bin/arm-linux-gnueabihf-'         
         if os_platform == 'linux' and arch == 'mipsel':
             os.environ['CROSS_COMPILE'] = '/opt/mips-2015.05-18/bin/mips-linux-gnu-'
         if os_platform == 'linux' and arch == 'ppc32':
@@ -267,8 +269,6 @@ class JenkinsBuild():
             os.environ['CROSS_COMPILE'] = '/opt/rtems-4.11-rsb/bin/powerpc-rtems4.11-'
         if os_platform == 'Core' and (arch == 'armv5' or arch == 'armv6'):
             os.environ['CROSS_COMPILE'] = '/opt/rtems-4.11-rsb/bin/arm-rtems4.11-'
-        if os_platform == 'Qnap' and arch == 'x19':
-            os.environ['CROSS_COMPILE'] = '/home/bldslv/qnap-gcc/cross-project/arm/marvell/bin/arm-none-linux-gnueabi-'
 
         # If building on a 64-bit machine it is possible that both 32-bit and 64-bit JDKs/JREs are installed, and JAVA_HOME may point to the wrong one for the target architecture.
         # Python provides no generic way to check if build machine OS is 32-bit or 64-bit.
@@ -293,6 +293,7 @@ class JenkinsBuild():
     def get_build_args(self):
         nightly = self.options.nightly
         arch = self.platform['arch']
+        distro = self.platform.get('distro', None)
         os_platform = self.platform['os']
         args = []
         args.append('python')
@@ -306,9 +307,7 @@ class JenkinsBuild():
            or self.options.release == '1':
             args.append('--buildonly')
         elif arch == 'x64':
-            if os_platform  == 'macos':
-                args.append('--native-tests')
-            elif os_platform not in ['windows', 'linux', 'iOs']:
+            if os_platform not in ['windows', 'linux', 'iOs', 'macos']:
                 args.append('--native-builds')
         if os_platform == 'windows' and arch == 'x86':
             args.append('--js')
@@ -317,8 +316,13 @@ class JenkinsBuild():
         if os_platform == 'linux' and arch == 'x86':
             args.append('--java')
         if os_platform == 'macos':
-            args.append('--mac-64')
-            self.platform_make_args.append('mac-64=1')
+            args.append('--native-tests')
+            if arch == 'x64':
+                args.append('--mac-64')
+                self.platform_make_args.append('Mac-x64=1')
+            elif arch == 'arm64':
+                args.append('--mac-arm64')
+                self.platform_make_args.append('Mac-arm64=1')
         if os_platform == 'iOs':
             if arch == 'x64':
                 args.append('--iOs-x64')
@@ -326,8 +330,11 @@ class JenkinsBuild():
             elif arch == 'arm64':
                 args.append('--iOs-arm64')
                 self.platform_make_args.append('iOs-arm64=1')
+            elif arch == 'arm64-sim':
+                args.append('--iOs-arm64-sim')
+                self.platform_make_args.append('iOs-arm64-sim=1')
         if os_platform == 'Linux':
-            if arch == 'rpi':
+            if arch == 'arhmf' and distro == 'raspbian':
                 args.append('--Linux-rpi')
                 self.platform_make_args.append('Linux-rpi=1')
             # 32 and 64-bit builds run in parallel on the same slave.
@@ -337,8 +344,6 @@ class JenkinsBuild():
         if os_platform == 'Android':
             args.append('--Android-anycpu')
             self.platform_make_args.append('Android-anycpu=1')
-        if os_platform == 'Qnap':
-            args.extend(['--qnap', '--buildonly'])
         if os_platform == 'Core':
             args.append('--core')
         if os_platform == 'linux' and arch == 'x86':
@@ -377,7 +382,7 @@ class JenkinsBuild():
             if build_t == 'release':
                 build.append('--incremental')
 
-            print( 'running build with %s' % (build,))
+            print('running build with %s' % (build,))
 
             ret = subprocess.check_call(build)
             if ret != 0:
@@ -391,7 +396,7 @@ class JenkinsBuild():
         version = self.options.version
         openhome_system = self.platform['system']
         openhome_architecture = self.platform['arch']
-
+        openhome_distro = self.platform.get('distro', None)
         release_targets = []
         release_targets.append('release')
         release_targets.append('debug')
@@ -408,8 +413,16 @@ class JenkinsBuild():
             build.append('make')
             build.append('tt')
             build.append('uset4=yes')
-            if self.platform['os'] == 'Qnap':
-                build.append('platform=' + platform)
+
+            if openhome_distro is not None:
+                build.append("openhome_distro=" + openhome_distro)
+                build.append('openhome_system=' + openhome_system.lower())
+            else:
+                build.append('openhome_system=' + openhome_system)
+            build.append('openhome_architecture=' + openhome_architecture)
+            build.append('openhome_configuration=' + openhome_configuration)
+
+            print("doing debug build %s" % (build,))
             ret = subprocess.check_call(build)
             if ret != 0:
                 print( ret )
@@ -423,21 +436,28 @@ class JenkinsBuild():
             build.append('make')
             build.append('bundle')
             build.append('uset4=yes')
-            if self.platform['os'] == 'Qnap':
-                build.append('platform=' + platform)
-            build.append('openhome_system=' + openhome_system)
+
+            if openhome_distro is not None:
+                build.append("openhome_distro=" + openhome_distro)
+                build.append('openhome_system=' + openhome_system.lower())
+            else:
+                build.append('openhome_system=' + openhome_system)
             build.append('openhome_architecture=' + openhome_architecture)
             build.append('openhome_configuration=' + openhome_configuration)
             build.extend(self.platform_make_args)
-            print( "doing release with bundle %s" % (build,))
+            print("doing release with bundle %s" % (build,))
 
             ret = subprocess.check_call(build)
             if ret != 0:
                 print( ret )
                 sys.exit(10)
 
-            native_bundle_name = os.path.join('Build/Bundles', "ohNet-%s-%s-%s.tar.gz" % (openhome_system, openhome_architecture, openhome_configuration))
-            native_dest = os.path.join('Build/Bundles', "ohNet-%s-%s-%s-%s.tar.gz" % (version, openhome_system, openhome_architecture, openhome_configuration))
+            if openhome_distro is not None:
+                native_bundle_name = os.path.join('Build/Bundles', "ohNet-%s-%s-%s-%s.tar.gz" % (openhome_architecture, openhome_distro, openhome_system.lower(), openhome_configuration))
+                native_dest = os.path.join('Build/Bundles', "ohNet-%s-%s-%s-%s-%s.tar.gz" % (version, openhome_architecture, openhome_distro, openhome_system.lower(), openhome_configuration))
+            else:
+                native_bundle_name = os.path.join('Build/Bundles', "ohNet-%s-%s-%s.tar.gz" % (openhome_system, openhome_architecture, openhome_configuration))
+                native_dest = os.path.join('Build/Bundles', "ohNet-%s-%s-%s-%s.tar.gz" % (version, openhome_system, openhome_architecture, openhome_configuration))                
             if os.path.exists(native_dest):
                 os.remove(native_dest)
             os.rename(native_bundle_name, native_dest)
