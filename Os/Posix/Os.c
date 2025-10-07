@@ -19,8 +19,14 @@
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD)
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#if !defined(PLATFORM_QNAP) && !defined(__ANDROID__)
+#include <netlink/genl/genl.h>  //genl_connect, genlmsg_put
+#include <netlink/genl/family.h>
+#include <netlink/genl/ctrl.h>  //genl_ctrl_resolve
+#include <linux/nl80211.h>      //NL80211 definitions
+#endif /* !PLATFORM_QNAP && !__ANDROID__ */
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD */
-#if defined(PLATFORM_MACOSX_GNU) || defined(PLATFORM_FREEBSD) || defined(PLATFORM_QNAP)
+#if defined(PLATFORM_MACOSX_GNU) || defined(PLATFORM_FREEBSD) || defined(PLATFORM_QNAP) 
 #include <net/if.h>
 #else
 #include <linux/wireless.h>
@@ -163,6 +169,9 @@ struct OsContext {
     OsThreadSchedulePolicy iSchedulerPolicy;
     pthread_key_t iThreadArgKey;
     struct InterfaceChangedObserver* iInterfaceChangedObserver;
+#if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(PLATFORM_QNAP) && !defined(__ANDROID__)
+    struct WirelessConfigContext* iWirelessConfigContext;
+#endif
     int32_t iThreadPriorityMin;
 #if defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_IOS)
     SleepWake* iSleepWake;
@@ -177,6 +186,10 @@ static void DestroyInterfaceChangedObserver(OsContext* aContext);
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(__ANDROID__)
 static void DnsRefreshCreate(OsContext* aContext);
 static void DnsRefreshDestroy(OsContext* aContext);
+#if !defined(PLATFORM_QNAP)
+static void WirelessConfigContextCreate(OsContext* aContext);
+static void WirelessConfigContextDestroy(OsContext* aContext);
+#endif /* !PLATFORM_QNAP */
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD && !defined(__ANDROID__) */
 
 #ifdef PLATFORM_MACOSX_GNU
@@ -246,6 +259,9 @@ OsContext* OsCreate(OsThreadSchedulePolicy aSchedulerPolicy)
 
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(__ANDROID__)
     DnsRefreshCreate(ctx);
+#if !defined(PLATFORM_QNAP)
+    WirelessConfigContextCreate(ctx);
+#endif /* !PLATFORM_QNAP */
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD && !defined(__ANDROID__) */
 
 #ifdef PLATFORM_MACOSX_GNU
@@ -271,6 +287,9 @@ void OsDestroy(OsContext* aContext)
 
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(__ANDROID__)
     DnsRefreshDestroy(aContext);
+#if !defined(PLATFORM_QNAP)
+    WirelessConfigContextDestroy(aContext);
+#endif /* !PLATFORM_QNAP */
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD && !defined(__ANDROID__) */
 
     DestroyInterfaceChangedObserver(aContext);
@@ -438,6 +457,12 @@ uint64_t OsTimeInUs(OsContext* aContext)
         fprintf(stderr, "WARNING: clock moved backwards by %llu.%03llusecs\n", (unsigned long long)diff.tv_sec, (unsigned long long)(diff.tv_usec/1000));
         aContext->iTimeAdjustment = addTimeval(&aContext->iTimeAdjustment, &diff);
     }
+    /* if previous reported time was more than 48 hours ago, assume system time has been updated and jumped forwards*/
+    /* calculate by how much and add this to aContext->iTimeAdjustment */
+    // if (now.tv_sec - aContext->iPrevTime.tv_sec > 172800) {
+    //     diff = subtractTimeval(&now, &aContext->iPrevTime);
+    //     aContext->iTimeAdjustment = subtractTimeval(&aContext->iTimeAdjustment, &diff);
+    // }
     aContext->iPrevTime = now; /* stash current time to allow the next call to spot any backwards move */
     adjustedNow = addTimeval(&now, &aContext->iTimeAdjustment); /* add any previous backwards moves to the time */
     diff = subtractTimeval(&adjustedNow, &aContext->iStartTime); /* how long since we started, ignoring any backwards moves */
@@ -1833,16 +1858,58 @@ int32_t OsNetworkSocketSetMulticastIf(THandle aHandle, TIpAddress aInterface)
 #endif
 }
 
-static int IsWireless(const char* ifname, int domain)
+
+#if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(PLATFORM_QNAP) && !defined(__ANDROID__)
+
+typedef struct WirelessConfigContext {
+    struct nl_sock *nlSock;
+    int nl80211Id;
+    struct nl_cb* nlCallback;
+    int nlCallbackDone;
+
+    char aIfNameToCheck[64];
+    int aIfNameMatched;
+
+} WirelessConfigContext;
+
+static int IsWireless(const char* aIfName, int aDomain, OsContext* aContext)
+{    
+    assert(aContext->iWirelessConfigContext != NULL);
+    strncpy(aContext->iWirelessConfigContext->aIfNameToCheck, aIfName, 64);
+    aContext->iWirelessConfigContext->aIfNameMatched = 0;
+    
+    struct nl_msg* msg = nlmsg_alloc();
+    aContext->iWirelessConfigContext->nlCallbackDone = 0;
+    genlmsg_put(msg,
+              NL_AUTO_PORT,
+              NL_AUTO_SEQ,
+              aContext->iWirelessConfigContext->nl80211Id,
+              0,
+              NLM_F_DUMP,
+              NL80211_CMD_GET_INTERFACE,
+              0);
+
+    nl_send_auto(aContext->iWirelessConfigContext->nlSock, msg);
+
+    while(aContext->iWirelessConfigContext->nlCallbackDone != 1) {
+        nl_recvmsgs(aContext->iWirelessConfigContext->nlSock, aContext->iWirelessConfigContext->nlCallback);
+    }
+    nlmsg_free(msg);  
+    int ret = aContext->iWirelessConfigContext->aIfNameMatched;
+    return ret;
+}
+
+#else
+static int IsWireless(const char* aIfName, int aDomain, OsContext* aContext)
 {
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_QNAP)
     int sock = -1;
     int err;
     struct iwreq pwrq;
     memset(&pwrq, 0, sizeof(pwrq));
-    strncpy(pwrq.ifr_name, ifname, IFNAMSIZ);
+    strncpy(pwrq.ifr_name, aIfName, IFNAMSIZ);
 
-    if ((sock = socket(domain, SOCK_STREAM, 0)) == -1) {
+    if ((sock = socket(aDomain, SOCK_STREAM, 0)) == -1) {
         return 0;
     }
 
@@ -1853,6 +1920,7 @@ static int IsWireless(const char* ifname, int domain)
     return 0;
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_QNAP */
 }
+#endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD && !PLATFORM_QNAP */
 
 static void append(OsNetworkAdapter* aAdapter, OsNetworkAdapter** aHead, OsNetworkAdapter** aTail)
 {
@@ -1956,7 +2024,7 @@ int32_t OsNetworkListAdapters(OsContext* aContext, OsNetworkAdapter** aAdapters,
         }
 
         ifaceIsIPv6 = (ifaceIter->ifa_addr->sa_family == AF_INET6);
-        ifaceIsWireless = IsWireless(ifaceIter->ifa_name, ifaceIter->ifa_addr->sa_family);
+        ifaceIsWireless = IsWireless(ifaceIter->ifa_name, ifaceIter->ifa_addr->sa_family, aContext);
         ifaceIsLoopback = IsLoopback(ifaceIter->ifa_addr);
 
         if (ifaceIsIPv6 && !includeIPv6) {
@@ -2244,6 +2312,8 @@ static int32_t ThreadJoin(THandle aThread)
 
 void adapterChangeObserverThread(void* aPtr)
 {
+    // TODO: consider changing this over to use libnl (since we're already using that for wireless)
+    // see https://stackoverflow.com/a/67387335 for neat example
     InterfaceChangedObserver* observer = (InterfaceChangedObserver*) aPtr;
     OsNetworkHandle *handle = observer->netHnd;
     char buffer[4096];
@@ -2454,6 +2524,67 @@ static void DnsRefreshDestroy(OsContext* aContext)
     OsNetworkClose(aContext->iDnsRefresh->iHandle);
     free(aContext->iDnsRefresh);
 }
+
+#if !defined(PLATFORM_QNAP)
+
+static int getWifiName_callback(struct nl_msg *msg, void *arg)
+{     
+    struct WirelessConfigContext* wifiCtx = arg;
+    struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
+
+    struct nlattr *tb_msg[NL80211_ATTR_MAX + 1];
+
+    nla_parse(tb_msg,
+            NL80211_ATTR_MAX,
+            genlmsg_attrdata(gnlh, 0),
+            genlmsg_attrlen(gnlh, 0),
+            NULL);
+
+    if (tb_msg[NL80211_ATTR_IFNAME]) {
+        if (strncmp(wifiCtx->aIfNameToCheck, nla_get_string(tb_msg[NL80211_ATTR_IFNAME]), strlen(wifiCtx->aIfNameToCheck)) == 0) {
+            printf("OhNet::Os::Posix::getWifiName_callback - interface %s is wireless!\n", wifiCtx->aIfNameToCheck);
+            wifiCtx->aIfNameMatched = 1;
+            return NL_SKIP;
+        }
+    }
+    return NL_SKIP;
+}
+
+static int finish_handler(struct nl_msg *msg, void *arg)
+{
+    struct WirelessConfigContext* wifiCtx = arg;
+    wifiCtx->nlCallbackDone = 1;
+    return NL_SKIP;
+}
+
+static void WirelessConfigContextCreate(OsContext* aContext) {
+    assert(aContext != NULL);
+    assert(aContext->iWirelessConfigContext == NULL);
+    WirelessConfigContext* wifiCtx = calloc(1, sizeof(struct WirelessConfigContext));
+
+    wifiCtx->nlSock = nl_socket_alloc();
+    // socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC);
+    genl_connect(wifiCtx->nlSock);   
+
+    wifiCtx->nl80211Id = genl_ctrl_resolve(wifiCtx->nlSock, NL80211_GENL_NAME);
+    assert(wifiCtx->nl80211Id >= 0);
+ 
+    wifiCtx->nlCallback = nl_cb_alloc(NL_CB_DEFAULT);
+    nl_cb_set(wifiCtx->nlCallback, NL_CB_VALID , NL_CB_CUSTOM, getWifiName_callback, wifiCtx);
+    nl_cb_set(wifiCtx->nlCallback, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, wifiCtx);
+    aContext->iWirelessConfigContext = wifiCtx;    
+}
+
+static void WirelessConfigContextDestroy(OsContext* aContext) {    
+    assert(aContext != NULL);
+    assert(aContext->iWirelessConfigContext != NULL);
+
+    nl_cb_put(aContext->iWirelessConfigContext->nlCallback);
+    nl_close(aContext->iWirelessConfigContext->nlSock);
+    nl_socket_free(aContext->iWirelessConfigContext->nlSock);  
+    free(aContext->iWirelessConfigContext);
+}
+#endif /* !PLATFORM_QNAP */
 
 #endif /* !PLATFORM_MACOSX_GNU  && !PLATFORM_FREEBSD && !defined(__ANDROID__) */
 

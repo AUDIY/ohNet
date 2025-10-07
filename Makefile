@@ -341,6 +341,7 @@ ifeq ($(vanilla_settings), yes)
 	endif
 	enablestacktrace = 
 	enablepthreadnames = 
+	requirelibnl = 
 	ifeq (,$(findstring Qnap,$(platform)))
 		# Enable stacktrace and pthread names for non-Qnap Linux platforms.
 		# These can be disabled by defining disable_stack_trace and
@@ -351,6 +352,7 @@ ifeq ($(vanilla_settings), yes)
 		ifeq (,$(disable_pthread_names))
 			enablepthreadnames = yes
 		endif
+		requirelibnl = yes
     else
 		platform_cflags += -DPLATFORM_QNAP
 	endif
@@ -387,6 +389,7 @@ inc_build = Build/Include
 includes = -IBuild/Include/ $(version_specific_includes)
 bundle_build = Build/Bundles
 mDNSdir = Build/mDNS
+libnldir = Build/libnl
 osdir ?= Posix
 objext = o
 libprefix = lib
@@ -606,6 +609,7 @@ copy_build_includes:
 
 patch_thirdparty_sources:
 	$(mkdir) $(mDNSdir)
+	$(mkdir) $(libnldir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSCore/*.c $(mDNSdir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSCore/*.h $(mDNSdir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSCore/*.patch $(mDNSdir)
@@ -617,6 +621,33 @@ patch_thirdparty_sources:
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSShared/dns_sd_internal.h $(mDNSdir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSShared/dns_sd_private.h $(mDNSdir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSShared/mDNSFeatures.h $(mDNSdir)
+
+	$(cp) thirdparty/libnl-3.11.0/lib/genl/ctrl.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/genl/family.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/genl/mngt.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/genl/genl.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/msg.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/attr.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/utils.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/addr.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/data.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/mpls.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/cache.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/object.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/handlers.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/socket.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/error.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/cache_mngt.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/hashtable.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/hash.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/nl.c $(libnldir)
+
+	$(cp) -r thirdparty/libnl-3.11.0/include $(libnldir)
+
+	cp thirdparty/libnl-3.11.0/lib/nl-core.h $(libnldir)
+	# cp thirdparty/libnl-3.11.0/lib/hashtable-api.h $(libnldir)
+	cp thirdparty/libnl-3.11.0/lib/genl/nl-genl.h $(libnldir)
+	cp thirdparty/libnl-3.11.0/lib/mpls.h $(libnldir)
 
 	for i in $(mDNSdir)/*.patch; do python thirdparty/python_patch/patch.py $$i; done
 
