@@ -1875,6 +1875,10 @@ typedef struct WirelessConfigContext {
 static int IsWireless(const char* aIfName, int aDomain, OsContext* aContext)
 {    
     assert(aContext->iWirelessConfigContext != NULL);
+    if (aContext->iWirelessConfigContext->nl80211Id <= 0) {
+        // system doesn't have nl80211 so can't have any wireless
+        return 0;
+    }
     strncpy(aContext->iWirelessConfigContext->aIfNameToCheck, aIfName, 64);
     aContext->iWirelessConfigContext->aIfNameMatched = 0;
     
@@ -2567,7 +2571,8 @@ static void WirelessConfigContextCreate(OsContext* aContext) {
     genl_connect(wifiCtx->nlSock);   
 
     wifiCtx->nl80211Id = genl_ctrl_resolve(wifiCtx->nlSock, NL80211_GENL_NAME);
-    assert(wifiCtx->nl80211Id >= 0);
+    // Don't assert here, but always check this before trying to send messages to interface!
+    // assert(wifiCtx->nl80211Id >= 0);
  
     wifiCtx->nlCallback = nl_cb_alloc(NL_CB_DEFAULT);
     nl_cb_set(wifiCtx->nlCallback, NL_CB_VALID , NL_CB_CUSTOM, getWifiName_callback, wifiCtx);
