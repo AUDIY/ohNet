@@ -130,7 +130,8 @@ objects_core = \
 	$(objdir)SignalHandlers.$(objext) \
 	$(objdir)Shell.$(objext) \
 	$(objdir)InfoProvider.$(objext) \
-	$(objdir)ShellCommandDebug.$(objext)
+	$(objdir)ShellCommandDebug.$(objext) \
+	$(extra_dependencies)
 
 
 # For simplicity, we make a list of all headers in the project and have all (core) source files depend on them
@@ -262,32 +263,6 @@ libnl_source = \
 	$(libnldir)/hashtable.c		\
 	$(libnldir)/hash.c			\
 	$(libnldir)/nl.c
-
-libnl_objs = \
-    $(objdir)ctrl.$(objext)         \
-	$(objdir)family.$(objext)		\
-	$(objdir)mngt.$(objext)			\
-	$(objdir)genl.$(objext)			\
-	$(objdir)msg.$(objext)			\
-	$(objdir)attr.$(objext)			\
-	$(objdir)utils.$(objext)		\
-	$(objdir)addr.$(objext)			\
-	$(objdir)data.$(objext)			\
-	$(objdir)mpls.$(objext)			\
-	$(objdir)cache.$(objext)		\
-	$(objdir)object.$(objext)		\
-	$(objdir)handlers.$(objext)		\
-	$(objdir)socket.$(objext)		\
-	$(objdir)error.$(objext)		\
-	$(objdir)cache_mngt.$(objext)	\
-	$(objdir)hashtable.$(objext)	\
-	$(objdir)hash.$(objext)			\
-	$(objdir)nl.$(objext)
-
-ifdef requirelibnl
-	objects_core += $(libnl_objs)
-	includes += -I$(libnldir)/include
-endif
 
 ohNetCore : make_obj_dir copy_build_includes patch_thirdparty_sources $(objects_core) $(objdir)$(libprefix)ohNetCore.$(libext)
 $(objdir)$(libprefix)ohNetCore.$(libext) : $(objects_core)

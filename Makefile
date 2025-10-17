@@ -23,7 +23,8 @@ openhome_configuration = Release
 android_ndk_debug=0
 endif
 
-
+extra_dependencies = 
+requirelibnl = 
 
 # Figure out platform, openhome_system and openhome_architecture
 
@@ -341,7 +342,6 @@ ifeq ($(vanilla_settings), yes)
 	endif
 	enablestacktrace = 
 	enablepthreadnames = 
-	requirelibnl = 
 	ifeq (,$(findstring Qnap,$(platform)))
 		# Enable stacktrace and pthread names for non-Qnap Linux platforms.
 		# These can be disabled by defining disable_stack_trace and
@@ -488,6 +488,33 @@ ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 # Include the rules to prepare the template engine and the macros to use it.
 ifeq ($(uset4), yes)
 include T4Linux.mak
+endif
+
+
+libnl_objs = \
+    $(objdir)ctrl.$(objext)         \
+	$(objdir)family.$(objext)		\
+	$(objdir)mngt.$(objext)			\
+	$(objdir)genl.$(objext)			\
+	$(objdir)msg.$(objext)			\
+	$(objdir)attr.$(objext)			\
+	$(objdir)utils.$(objext)		\
+	$(objdir)addr.$(objext)			\
+	$(objdir)data.$(objext)			\
+	$(objdir)mpls.$(objext)			\
+	$(objdir)cache.$(objext)		\
+	$(objdir)object.$(objext)		\
+	$(objdir)handlers.$(objext)		\
+	$(objdir)socket.$(objext)		\
+	$(objdir)error.$(objext)		\
+	$(objdir)cache_mngt.$(objext)	\
+	$(objdir)hashtable.$(objext)	\
+	$(objdir)hash.$(objext)			\
+	$(objdir)nl.$(objext)
+
+ifdef requirelibnl
+	extra_dependencies += $(libnl_objs)
+	includes += -I$(libnldir)/include
 endif
 
 # Actual building of code is shared between platforms

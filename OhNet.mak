@@ -103,6 +103,7 @@ installincludedir = $(installdir)\include
 mkdir = Scripts\mkdir.bat
 rmdir = Scripts\rmdir.bat
 uset4 = no
+extra_dependencies = 
 
 default : all
 
