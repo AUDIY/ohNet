@@ -243,27 +243,6 @@ headers = \
 	$(inc_build)/OpenHome/Net/Core/DvServerUpnp.h \
 	$(inc_build)/OpenHome/Net/Core/FunctorCpDevice.h
 
-libnl_source = \
-    $(libnldir)/ctrl.c          \
-	$(libnldir)/family.c		\
-	$(libnldir)/mngt.c			\
-	$(libnldir)/genl.c			\
-	$(libnldir)/msg.c			\
-	$(libnldir)/attr.c			\
-	$(libnldir)/utils.c			\
-	$(libnldir)/addr.c			\
-	$(libnldir)/data.c			\
-	$(libnldir)/mpls.c			\
-	$(libnldir)/cache.c			\
-	$(libnldir)/object.c		\
-	$(libnldir)/handlers.c		\
-	$(libnldir)/socket.c		\
-	$(libnldir)/error.c			\
-	$(libnldir)/cache_mngt.c	\
-	$(libnldir)/hashtable.c		\
-	$(libnldir)/hash.c			\
-	$(libnldir)/nl.c
-
 ohNetCore : make_obj_dir copy_build_includes patch_thirdparty_sources $(objects_core) $(objdir)$(libprefix)ohNetCore.$(libext)
 $(objdir)$(libprefix)ohNetCore.$(libext) : $(objects_core)
 	$(ar)$(libprefix)ohNetCore.$(libext) $(objects_core)
@@ -524,8 +503,8 @@ $(objdir)handlers.$(objext) : $(libnldir)/handlers.c $(headers)
 	$(compiler)handlers.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/handlers.c
 $(objdir)socket.$(objext) : $(libnldir)/socket.c $(headers)
 	$(compiler)socket.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/socket.c
-$(objdir)error.$(objext) : $(libnldir)/error.c $(headers)
-	$(compiler)error.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/error.c
+$(objdir)nl_error.$(objext) : $(libnldir)/error.c $(headers)
+	$(compiler)nl_error.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/error.c
 $(objdir)cache_mngt.$(objext) : $(libnldir)/cache_mngt.c $(headers)
 	$(compiler)cache_mngt.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/cache_mngt.c
 $(objdir)hashtable.$(objext) : $(libnldir)/hashtable.c $(headers)

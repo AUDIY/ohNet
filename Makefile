@@ -506,7 +506,7 @@ libnl_objs = \
 	$(objdir)object.$(objext)		\
 	$(objdir)handlers.$(objext)		\
 	$(objdir)socket.$(objext)		\
-	$(objdir)error.$(objext)		\
+	$(objdir)nl_error.$(objext)		\
 	$(objdir)cache_mngt.$(objext)	\
 	$(objdir)hashtable.$(objext)	\
 	$(objdir)hash.$(objext)			\
