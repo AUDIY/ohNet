@@ -7,8 +7,6 @@
 #include <pthread.h>
 #include <errno.h>
 #include <assert.h>
-#include <sys/time.h> // eScheduleNice only
-#include <sys/resource.h> // eScheduleNice only
 #include <string.h>
 #include <sys/types.h>
 #include <sys/select.h>
@@ -166,7 +164,7 @@ struct OsContext {
     THandle iMutex;
     THandle iMutexNetwork;
     THandle iMutexTime;
-    OsThreadSchedulePolicy iSchedulerPolicy;
+    int iThreadPrioritiesEnabled;
     pthread_key_t iThreadArgKey;
     struct InterfaceChangedObserver* iInterfaceChangedObserver;
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(PLATFORM_QNAP) && !defined(__ANDROID__)
@@ -241,7 +239,7 @@ OsContext* OsCreate(OsThreadSchedulePolicy aSchedulerPolicy)
     gettimeofday(&ctx->iStartTime, NULL);
     ctx->iPrevTime = ctx->iStartTime;
     memset(&ctx->iTimeAdjustment, 0, sizeof(ctx->iTimeAdjustment));
-    ctx->iSchedulerPolicy = aSchedulerPolicy;
+    ctx->iThreadPrioritiesEnabled = (aSchedulerPolicy == eScheduleDefault || aSchedulerPolicy == eSchedulePriority);
 
     if (OsInitialiseOsMutexes(ctx) != 0) {
         OsDestroyOsMutexes(ctx);
@@ -694,7 +692,7 @@ THandle OsMutexCreate(OsContext* aContext, const char* aName)
     pthread_mutexattr_init(&attr);
     (void)pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
 #ifndef __ANDROID__
-    if (aContext->iSchedulerPolicy == eSchedulePriorityEnable) {
+    if (aContext->iThreadPrioritiesEnabled) {
         int err = pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT);
         if (err != 0) {
             fprintf(stderr, "OsMutexCreate - failed to set PTHREAD_PRIO_INHERIT - error=%d\n", err);
@@ -742,17 +740,10 @@ int32_t OsMutexUnlock(THandle aMutex)
 
 void OsThreadGetPriorityRange(OsContext* aContext, uint32_t* aHostMin, uint32_t* aHostMax)
 {
-    if (aContext->iSchedulerPolicy == eSchedulePriorityEnable) {
-        const int32_t platMin = sched_get_priority_min(kThreadSchedPolicy);
-        const int32_t platMax = sched_get_priority_max(kThreadSchedPolicy);
-        aContext->iThreadPriorityMin = platMin;
-        *aHostMin = 0;
-        *aHostMax = platMax - platMin;
-    }
-    else if (aContext->iSchedulerPolicy == eScheduleNice) {
-        // FIXME - 50/150 copied from previous expectations of threadEntrypoint
-        *aHostMin = 50;
-        *aHostMax = 150;
+    if (aContext->iThreadPrioritiesEnabled) {
+        *aHostMin = sched_get_priority_min(kThreadSchedPolicy);
+        *aHostMax = sched_get_priority_max(kThreadSchedPolicy);
+        aContext->iThreadPriorityMin = *aHostMin;
     }
     else {
         *aHostMin = 1;
@@ -781,7 +772,7 @@ static void* threadEntrypoint(void* aArg)
     ThreadData* data = (ThreadData*)aArg;
     assert(data != NULL);
 
-    if (data->iCtx->iSchedulerPolicy == eSchedulePriorityEnable) {
+    if (data->iCtx->iThreadPrioritiesEnabled) {
         int32_t priority = ((int32_t)data->iPriority) + data->iCtx->iThreadPriorityMin;
         struct sched_param param;
         memset(&param, 0, sizeof(param));
@@ -797,19 +788,6 @@ static void* threadEntrypoint(void* aArg)
 #endif
             printf("Attempt to set thread priority for '%s' to %d failed with %d(%d)\n", name, priority, status, errno);
         }
-    }
-    else if (data->iCtx->iSchedulerPolicy == eScheduleNice) {
-        static const int kMinimumNice = 5; // set MIN
-        // Map all prios > 105 -> nice 0 (default), anything else to MIN
-        //int nice_value = (data->iPriority > 105 ? 0 : kMinimumNice);
-        // Map prio=[50,150]-> nice=[MIN,0]
-        int nice_value = -1 * (((((int) data->iPriority-50) * kMinimumNice) / (150-50)) - kMinimumNice);
-        if ( nice_value < 0 )
-            nice_value = 0;
-        //printf("Thread of priority %d asking for niceness %d (current niceness is %d)\n", data->iPriority, nice_value, getpriority(PRIO_PROCESS, 0));
-        /*int result = */setpriority(PRIO_PROCESS, 0, nice_value);
-        //if ( result == -1 )
-        //    perror("Warning: Could not renice this thread");
     }
 
     // Disable cancellation - we're in a C++ environment, and
@@ -909,10 +887,7 @@ void OsThreadDestroy(THandle aThread)
 
 int32_t OsThreadSupportsPriorities(OsContext* aContext)
 {
-    if (aContext->iSchedulerPolicy == eSchedulePriorityEnable) {
-        return 1;
-    }
-    return 0;
+    return aContext->iThreadPrioritiesEnabled;
 }
 
 static int nfds(const OsNetworkHandle* aHandle)

@@ -70,7 +70,6 @@ public:
     {
         EScheduleDefault,
         ESchedulePriority,
-        EScheduleNice,
         EScheduleNone
     };
 private:
