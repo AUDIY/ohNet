@@ -7,8 +7,6 @@
 #include <pthread.h>
 #include <errno.h>
 #include <assert.h>
-#include <sys/time.h> // eScheduleNice only
-#include <sys/resource.h> // eScheduleNice only
 #include <string.h>
 #include <sys/types.h>
 #include <sys/select.h>
@@ -19,8 +17,14 @@
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD)
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#if !defined(PLATFORM_QNAP) && !defined(__ANDROID__)
+#include <netlink/genl/genl.h>  //genl_connect, genlmsg_put
+#include <netlink/genl/family.h>
+#include <netlink/genl/ctrl.h>  //genl_ctrl_resolve
+#include <linux/nl80211.h>      //NL80211 definitions
+#endif /* !PLATFORM_QNAP && !__ANDROID__ */
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD */
-#if defined(PLATFORM_MACOSX_GNU) || defined(PLATFORM_FREEBSD) || defined(PLATFORM_QNAP)
+#if defined(PLATFORM_MACOSX_GNU) || defined(PLATFORM_FREEBSD) || defined(PLATFORM_QNAP) 
 #include <net/if.h>
 #else
 #include <linux/wireless.h>
@@ -153,16 +157,16 @@ typedef struct SleepWake
 #endif
 
 struct OsContext {
-    struct timeval iStartTime; /* Time OsCreate was called */
-    struct timeval iPrevTime; /* Last time OsTimeInUs() was called */
-    struct timeval iTimeAdjustment; /* Amount to adjust return for OsTimeInUs() by. 
-                                       Will be 0 unless time ever jumps backwards. */
+    struct timespec iStartTime; /* Time OsCreate was called */
     THandle iMutex;
     THandle iMutexNetwork;
     THandle iMutexTime;
-    OsThreadSchedulePolicy iSchedulerPolicy;
+    int iThreadPrioritiesEnabled;
     pthread_key_t iThreadArgKey;
     struct InterfaceChangedObserver* iInterfaceChangedObserver;
+#if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(PLATFORM_QNAP) && !defined(__ANDROID__)
+    struct WirelessConfigContext* iWirelessConfigContext;
+#endif
     int32_t iThreadPriorityMin;
 #if defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_IOS)
     SleepWake* iSleepWake;
@@ -177,6 +181,10 @@ static void DestroyInterfaceChangedObserver(OsContext* aContext);
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(__ANDROID__)
 static void DnsRefreshCreate(OsContext* aContext);
 static void DnsRefreshDestroy(OsContext* aContext);
+#if !defined(PLATFORM_QNAP)
+static void WirelessConfigContextCreate(OsContext* aContext);
+static void WirelessConfigContextDestroy(OsContext* aContext);
+#endif /* !PLATFORM_QNAP */
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD && !defined(__ANDROID__) */
 
 #ifdef PLATFORM_MACOSX_GNU
@@ -225,10 +233,8 @@ static void OsDestroyOsMutexes(OsContext* aContext)
 OsContext* OsCreate(OsThreadSchedulePolicy aSchedulerPolicy)
 {
     OsContext* ctx = calloc(1, sizeof(*ctx));
-    gettimeofday(&ctx->iStartTime, NULL);
-    ctx->iPrevTime = ctx->iStartTime;
-    memset(&ctx->iTimeAdjustment, 0, sizeof(ctx->iTimeAdjustment));
-    ctx->iSchedulerPolicy = aSchedulerPolicy;
+    clock_gettime(CLOCK_MONOTONIC, &ctx->iStartTime);
+    ctx->iThreadPrioritiesEnabled = (aSchedulerPolicy == eScheduleDefault || aSchedulerPolicy == eSchedulePriority);
 
     if (OsInitialiseOsMutexes(ctx) != 0) {
         OsDestroyOsMutexes(ctx);
@@ -246,6 +252,9 @@ OsContext* OsCreate(OsThreadSchedulePolicy aSchedulerPolicy)
 
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(__ANDROID__)
     DnsRefreshCreate(ctx);
+#if !defined(PLATFORM_QNAP)
+    WirelessConfigContextCreate(ctx);
+#endif /* !PLATFORM_QNAP */
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD && !defined(__ANDROID__) */
 
 #ifdef PLATFORM_MACOSX_GNU
@@ -271,6 +280,9 @@ void OsDestroy(OsContext* aContext)
 
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(__ANDROID__)
     DnsRefreshDestroy(aContext);
+#if !defined(PLATFORM_QNAP)
+    WirelessConfigContextDestroy(aContext);
+#endif /* !PLATFORM_QNAP */
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD && !defined(__ANDROID__) */
 
     DestroyInterfaceChangedObserver(aContext);
@@ -396,54 +408,29 @@ void OsStackTraceFinalise(THandle aStackTrace)
 #endif /* STACK_TRACE_ENABLE */
 }
 
-static struct timeval subtractTimeval(struct timeval* aT1, struct timeval* aT2)
+static struct timespec timespecSubtract(struct timespec* aT1, struct timespec* aT2)
 {
-    struct timeval diff;
+    struct timespec diff;
     diff.tv_sec = aT1->tv_sec - aT2->tv_sec;
-    if (aT1->tv_usec > aT2->tv_usec) {
-        diff.tv_usec = aT1->tv_usec - aT2->tv_usec;
+    if (aT1->tv_nsec > aT2->tv_nsec) {
+        diff.tv_nsec = aT1->tv_nsec - aT2->tv_nsec;
     }
     else {
         diff.tv_sec--;
-        diff.tv_usec = 1000000 - aT2->tv_usec + aT1->tv_usec;
+        diff.tv_nsec = 1000000000 - aT2->tv_nsec + aT1->tv_nsec;
     }
     return diff;
 }
 
-static struct timeval addTimeval(struct timeval* aT1, struct timeval* aT2)
-{
-    struct timeval result;
-    result.tv_sec = aT1->tv_sec + aT2->tv_sec;
-    int32_t usec = aT1->tv_usec + aT2->tv_usec;
-    if (usec < 1000000) {
-        result.tv_usec = usec;
-    }
-    else {
-        result.tv_sec++;
-        result.tv_usec = usec - 1000000;
-    }
-    return result;
-}
-
 uint64_t OsTimeInUs(OsContext* aContext)
 {
-    struct timeval now, diff, adjustedNow;
+    struct timespec now, diff;
     OsMutexLock(aContext->iMutexTime);
-    gettimeofday(&now, NULL);
-    
-    /* if time has moved backwards, calculate by how much and add this to aContext->iTimeAdjustment */
-    if (now.tv_sec < aContext->iPrevTime.tv_sec ||
-        (now.tv_sec == aContext->iPrevTime.tv_sec && now.tv_usec < aContext->iPrevTime.tv_usec)) {
-        diff = subtractTimeval(&aContext->iPrevTime, &now);
-        fprintf(stderr, "WARNING: clock moved backwards by %llu.%03llusecs\n", (unsigned long long)diff.tv_sec, (unsigned long long)(diff.tv_usec/1000));
-        aContext->iTimeAdjustment = addTimeval(&aContext->iTimeAdjustment, &diff);
-    }
-    aContext->iPrevTime = now; /* stash current time to allow the next call to spot any backwards move */
-    adjustedNow = addTimeval(&now, &aContext->iTimeAdjustment); /* add any previous backwards moves to the time */
-    diff = subtractTimeval(&adjustedNow, &aContext->iStartTime); /* how long since we started, ignoring any backwards moves */
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    diff = timespecSubtract(&now, &aContext->iStartTime);
     OsMutexUnlock(aContext->iMutexTime);
 
-    return (uint64_t)diff.tv_sec * 1000000 + diff.tv_usec;
+    return (uint64_t)((now.tv_sec * 1000000) + (now.tv_nsec / 1000));
 }
 
 void OsConsoleWrite(const char* aStr)
@@ -669,7 +656,7 @@ THandle OsMutexCreate(OsContext* aContext, const char* aName)
     pthread_mutexattr_init(&attr);
     (void)pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
 #ifndef __ANDROID__
-    if (aContext->iSchedulerPolicy == eSchedulePriorityEnable) {
+    if (aContext->iThreadPrioritiesEnabled) {
         int err = pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT);
         if (err != 0) {
             fprintf(stderr, "OsMutexCreate - failed to set PTHREAD_PRIO_INHERIT - error=%d\n", err);
@@ -717,17 +704,10 @@ int32_t OsMutexUnlock(THandle aMutex)
 
 void OsThreadGetPriorityRange(OsContext* aContext, uint32_t* aHostMin, uint32_t* aHostMax)
 {
-    if (aContext->iSchedulerPolicy == eSchedulePriorityEnable) {
-        const int32_t platMin = sched_get_priority_min(kThreadSchedPolicy);
-        const int32_t platMax = sched_get_priority_max(kThreadSchedPolicy);
-        aContext->iThreadPriorityMin = platMin;
-        *aHostMin = 0;
-        *aHostMax = platMax - platMin;
-    }
-    else if (aContext->iSchedulerPolicy == eScheduleNice) {
-        // FIXME - 50/150 copied from previous expectations of threadEntrypoint
-        *aHostMin = 50;
-        *aHostMax = 150;
+    if (aContext->iThreadPrioritiesEnabled) {
+        *aHostMin = sched_get_priority_min(kThreadSchedPolicy);
+        *aHostMax = sched_get_priority_max(kThreadSchedPolicy);
+        aContext->iThreadPriorityMin = *aHostMin;
     }
     else {
         *aHostMin = 1;
@@ -756,7 +736,7 @@ static void* threadEntrypoint(void* aArg)
     ThreadData* data = (ThreadData*)aArg;
     assert(data != NULL);
 
-    if (data->iCtx->iSchedulerPolicy == eSchedulePriorityEnable) {
+    if (data->iCtx->iThreadPrioritiesEnabled) {
         int32_t priority = ((int32_t)data->iPriority) + data->iCtx->iThreadPriorityMin;
         struct sched_param param;
         memset(&param, 0, sizeof(param));
@@ -772,19 +752,6 @@ static void* threadEntrypoint(void* aArg)
 #endif
             printf("Attempt to set thread priority for '%s' to %d failed with %d(%d)\n", name, priority, status, errno);
         }
-    }
-    else if (data->iCtx->iSchedulerPolicy == eScheduleNice) {
-        static const int kMinimumNice = 5; // set MIN
-        // Map all prios > 105 -> nice 0 (default), anything else to MIN
-        //int nice_value = (data->iPriority > 105 ? 0 : kMinimumNice);
-        // Map prio=[50,150]-> nice=[MIN,0]
-        int nice_value = -1 * (((((int) data->iPriority-50) * kMinimumNice) / (150-50)) - kMinimumNice);
-        if ( nice_value < 0 )
-            nice_value = 0;
-        //printf("Thread of priority %d asking for niceness %d (current niceness is %d)\n", data->iPriority, nice_value, getpriority(PRIO_PROCESS, 0));
-        /*int result = */setpriority(PRIO_PROCESS, 0, nice_value);
-        //if ( result == -1 )
-        //    perror("Warning: Could not renice this thread");
     }
 
     // Disable cancellation - we're in a C++ environment, and
@@ -884,10 +851,7 @@ void OsThreadDestroy(THandle aThread)
 
 int32_t OsThreadSupportsPriorities(OsContext* aContext)
 {
-    if (aContext->iSchedulerPolicy == eSchedulePriorityEnable) {
-        return 1;
-    }
-    return 0;
+    return aContext->iThreadPrioritiesEnabled;
 }
 
 static int nfds(const OsNetworkHandle* aHandle)
@@ -1833,16 +1797,62 @@ int32_t OsNetworkSocketSetMulticastIf(THandle aHandle, TIpAddress aInterface)
 #endif
 }
 
-static int IsWireless(const char* ifname, int domain)
+
+#if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_FREEBSD) && !defined(PLATFORM_QNAP) && !defined(__ANDROID__)
+
+typedef struct WirelessConfigContext {
+    struct nl_sock *nlSock;
+    int nl80211Id;
+    struct nl_cb* nlCallback;
+    int nlCallbackDone;
+
+    char aIfNameToCheck[64];
+    int aIfNameMatched;
+
+} WirelessConfigContext;
+
+static int IsWireless(const char* aIfName, int aDomain, OsContext* aContext)
+{    
+    assert(aContext->iWirelessConfigContext != NULL);
+    if (aContext->iWirelessConfigContext->nl80211Id <= 0) {
+        // system doesn't have nl80211 so can't have any wireless
+        return 0;
+    }
+    strncpy(aContext->iWirelessConfigContext->aIfNameToCheck, aIfName, 64);
+    aContext->iWirelessConfigContext->aIfNameMatched = 0;
+    
+    struct nl_msg* msg = nlmsg_alloc();
+    aContext->iWirelessConfigContext->nlCallbackDone = 0;
+    genlmsg_put(msg,
+              NL_AUTO_PORT,
+              NL_AUTO_SEQ,
+              aContext->iWirelessConfigContext->nl80211Id,
+              0,
+              NLM_F_DUMP,
+              NL80211_CMD_GET_INTERFACE,
+              0);
+
+    nl_send_auto(aContext->iWirelessConfigContext->nlSock, msg);
+
+    while(aContext->iWirelessConfigContext->nlCallbackDone != 1) {
+        nl_recvmsgs(aContext->iWirelessConfigContext->nlSock, aContext->iWirelessConfigContext->nlCallback);
+    }
+    nlmsg_free(msg);  
+    int ret = aContext->iWirelessConfigContext->aIfNameMatched;
+    return ret;
+}
+
+#else
+static int IsWireless(const char* aIfName, int aDomain, OsContext* aContext)
 {
 #if !defined(PLATFORM_MACOSX_GNU) && !defined(PLATFORM_QNAP)
     int sock = -1;
     int err;
     struct iwreq pwrq;
     memset(&pwrq, 0, sizeof(pwrq));
-    strncpy(pwrq.ifr_name, ifname, IFNAMSIZ);
+    strncpy(pwrq.ifr_name, aIfName, IFNAMSIZ);
 
-    if ((sock = socket(domain, SOCK_STREAM, 0)) == -1) {
+    if ((sock = socket(aDomain, SOCK_STREAM, 0)) == -1) {
         return 0;
     }
 
@@ -1853,6 +1863,7 @@ static int IsWireless(const char* ifname, int domain)
     return 0;
 #endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_QNAP */
 }
+#endif /* !PLATFORM_MACOSX_GNU && !PLATFORM_FREEBSD && !PLATFORM_QNAP */
 
 static void append(OsNetworkAdapter* aAdapter, OsNetworkAdapter** aHead, OsNetworkAdapter** aTail)
 {
@@ -1956,7 +1967,7 @@ int32_t OsNetworkListAdapters(OsContext* aContext, OsNetworkAdapter** aAdapters,
         }
 
         ifaceIsIPv6 = (ifaceIter->ifa_addr->sa_family == AF_INET6);
-        ifaceIsWireless = IsWireless(ifaceIter->ifa_name, ifaceIter->ifa_addr->sa_family);
+        ifaceIsWireless = IsWireless(ifaceIter->ifa_name, ifaceIter->ifa_addr->sa_family, aContext);
         ifaceIsLoopback = IsLoopback(ifaceIter->ifa_addr);
 
         if (ifaceIsIPv6 && !includeIPv6) {
@@ -2244,6 +2255,8 @@ static int32_t ThreadJoin(THandle aThread)
 
 void adapterChangeObserverThread(void* aPtr)
 {
+    // TODO: consider changing this over to use libnl (since we're already using that for wireless)
+    // see https://stackoverflow.com/a/67387335 for neat example
     InterfaceChangedObserver* observer = (InterfaceChangedObserver*) aPtr;
     OsNetworkHandle *handle = observer->netHnd;
     char buffer[4096];
@@ -2454,6 +2467,68 @@ static void DnsRefreshDestroy(OsContext* aContext)
     OsNetworkClose(aContext->iDnsRefresh->iHandle);
     free(aContext->iDnsRefresh);
 }
+
+#if !defined(PLATFORM_QNAP)
+
+static int getWifiName_callback(struct nl_msg *msg, void *arg)
+{     
+    struct WirelessConfigContext* wifiCtx = arg;
+    struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
+
+    struct nlattr *tb_msg[NL80211_ATTR_MAX + 1];
+
+    nla_parse(tb_msg,
+            NL80211_ATTR_MAX,
+            genlmsg_attrdata(gnlh, 0),
+            genlmsg_attrlen(gnlh, 0),
+            NULL);
+
+    if (tb_msg[NL80211_ATTR_IFNAME]) {
+        if (strncmp(wifiCtx->aIfNameToCheck, nla_get_string(tb_msg[NL80211_ATTR_IFNAME]), strlen(wifiCtx->aIfNameToCheck)) == 0) {
+            printf("OhNet::Os::Posix::getWifiName_callback - interface %s is wireless!\n", wifiCtx->aIfNameToCheck);
+            wifiCtx->aIfNameMatched = 1;
+            return NL_SKIP;
+        }
+    }
+    return NL_SKIP;
+}
+
+static int finish_handler(struct nl_msg *msg, void *arg)
+{
+    struct WirelessConfigContext* wifiCtx = arg;
+    wifiCtx->nlCallbackDone = 1;
+    return NL_SKIP;
+}
+
+static void WirelessConfigContextCreate(OsContext* aContext) {
+    assert(aContext != NULL);
+    assert(aContext->iWirelessConfigContext == NULL);
+    WirelessConfigContext* wifiCtx = calloc(1, sizeof(struct WirelessConfigContext));
+
+    wifiCtx->nlSock = nl_socket_alloc();
+    // socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC);
+    genl_connect(wifiCtx->nlSock);   
+
+    wifiCtx->nl80211Id = genl_ctrl_resolve(wifiCtx->nlSock, NL80211_GENL_NAME);
+    // Don't assert here, but always check this before trying to send messages to interface!
+    // assert(wifiCtx->nl80211Id >= 0);
+ 
+    wifiCtx->nlCallback = nl_cb_alloc(NL_CB_DEFAULT);
+    nl_cb_set(wifiCtx->nlCallback, NL_CB_VALID , NL_CB_CUSTOM, getWifiName_callback, wifiCtx);
+    nl_cb_set(wifiCtx->nlCallback, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, wifiCtx);
+    aContext->iWirelessConfigContext = wifiCtx;    
+}
+
+static void WirelessConfigContextDestroy(OsContext* aContext) {    
+    assert(aContext != NULL);
+    assert(aContext->iWirelessConfigContext != NULL);
+
+    nl_cb_put(aContext->iWirelessConfigContext->nlCallback);
+    nl_close(aContext->iWirelessConfigContext->nlSock);
+    nl_socket_free(aContext->iWirelessConfigContext->nlSock);  
+    free(aContext->iWirelessConfigContext);
+}
+#endif /* !PLATFORM_QNAP */
 
 #endif /* !PLATFORM_MACOSX_GNU  && !PLATFORM_FREEBSD && !defined(__ANDROID__) */
 

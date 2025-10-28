@@ -158,6 +158,7 @@ class JenkinsBuild():
             'Macos-x64': { 'os': 'macos', 'arch': 'x86', 'publish': False, 'system': 'Mac'},  # Old Jenkins label
             'Mac-x64': { 'os': 'macos', 'arch': 'x64', 'publish': True, 'system': 'Mac'},     # New Jenkins label, matches downstream builds
             'Mac-arm64': { 'os': 'macos', 'arch': 'arm64', 'publish': True, 'system': 'Mac'},     # New Jenkins label, matches downstream builds
+            'Mac-arm64-maccatalyst': { 'os': 'macos', 'arch': 'arm64-catalyst', 'publish': True, 'system': 'Mac'},     # New Jenkins label, matches downstream builds
             'armhf-buildroot-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'buildroot'},
             'armhf-raspbian-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'raspbian'},
             'armhf-kirkstone-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'kirkstone'},
@@ -323,6 +324,9 @@ class JenkinsBuild():
             elif arch == 'arm64':
                 args.append('--mac-arm64')
                 self.platform_make_args.append('Mac-arm64=1')
+            elif arch == 'arm64-catalyst':
+                args.append('--mac-arm64-maccatalyst')
+                self.platform_make_args.append('Mac-arm64-maccatalyst=1')
         if os_platform == 'iOs':
             if arch == 'x64':
                 args.append('--iOs-x64')

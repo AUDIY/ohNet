@@ -23,7 +23,8 @@ openhome_configuration = Release
 android_ndk_debug=0
 endif
 
-
+extra_dependencies = 
+requirelibnl = 
 
 # Figure out platform, openhome_system and openhome_architecture
 
@@ -57,6 +58,8 @@ ifeq ($(MACHINE),Darwin)
     detected_openhome_system = Mac
     ifeq ($(Mac-x64),1)
         detected_openhome_architecture = x64
+    else ifeq($(Maccatalyst-arm64),1)
+        detected_openhome_architecture = arm64-catalyst
     else
         detected_openhome_architecture = arm64
     endif
@@ -224,12 +227,19 @@ ifeq ($(platform),Mac)
         osbuilddir = Mac-x64
         openhome_architecture = x64
         dotnetRuntime = osx-x64
+    else ifeq ($(detected_openhome_architecture),arm64-catalyst)
+        mac_osx_arch = arm64
+        osbuilddir = Mac-arm64
+        openhome_architecture = arm64
+        dotnetRuntime = osx-arm64
+        dotnetFramework = net8.0-maccatalyst
     else
         mac_osx_arch = arm64
         osbuilddir = Mac-arm64
         openhome_architecture = arm64
         dotnetRuntime = osx-arm64
 	endif
+
 
     platform_cflags = -DPLATFORM_MACOSX_GNU -arch $(mac_osx_arch) -mmacosx-version-min=11 -Wno-unused-command-line-argument
     platform_linkflags = -arch $(mac_osx_arch) -framework CoreFoundation -framework SystemConfiguration -framework IOKit
@@ -351,6 +361,7 @@ ifeq ($(vanilla_settings), yes)
 		ifeq (,$(disable_pthread_names))
 			enablepthreadnames = yes
 		endif
+		requirelibnl = yes
     else
 		platform_cflags += -DPLATFORM_QNAP
 	endif
@@ -387,6 +398,7 @@ inc_build = Build/Include
 includes = -IBuild/Include/ $(version_specific_includes)
 bundle_build = Build/Bundles
 mDNSdir = Build/mDNS
+libnldir = Build/libnl
 osdir ?= Posix
 objext = o
 libprefix = lib
@@ -485,6 +497,33 @@ ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 # Include the rules to prepare the template engine and the macros to use it.
 ifeq ($(uset4), yes)
 include T4Linux.mak
+endif
+
+
+libnl_objs = \
+    $(objdir)ctrl.$(objext)         \
+	$(objdir)family.$(objext)		\
+	$(objdir)mngt.$(objext)			\
+	$(objdir)genl.$(objext)			\
+	$(objdir)msg.$(objext)			\
+	$(objdir)attr.$(objext)			\
+	$(objdir)utils.$(objext)		\
+	$(objdir)addr.$(objext)			\
+	$(objdir)data.$(objext)			\
+	$(objdir)mpls.$(objext)			\
+	$(objdir)cache.$(objext)		\
+	$(objdir)object.$(objext)		\
+	$(objdir)handlers.$(objext)		\
+	$(objdir)socket.$(objext)		\
+	$(objdir)nl_error.$(objext)		\
+	$(objdir)cache_mngt.$(objext)	\
+	$(objdir)hashtable.$(objext)	\
+	$(objdir)hash.$(objext)			\
+	$(objdir)nl.$(objext)
+
+ifdef requirelibnl
+	extra_dependencies += $(libnl_objs)
+	includes += -I$(libnldir)/include
 endif
 
 # Actual building of code is shared between platforms
@@ -606,6 +645,7 @@ copy_build_includes:
 
 patch_thirdparty_sources:
 	$(mkdir) $(mDNSdir)
+	$(mkdir) $(libnldir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSCore/*.c $(mDNSdir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSCore/*.h $(mDNSdir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSCore/*.patch $(mDNSdir)
@@ -617,6 +657,33 @@ patch_thirdparty_sources:
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSShared/dns_sd_internal.h $(mDNSdir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSShared/dns_sd_private.h $(mDNSdir)
 	$(cp) thirdparty/mDNSResponder-1310.80.1/mDNSShared/mDNSFeatures.h $(mDNSdir)
+
+	$(cp) thirdparty/libnl-3.11.0/lib/genl/ctrl.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/genl/family.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/genl/mngt.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/genl/genl.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/msg.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/attr.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/utils.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/addr.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/data.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/mpls.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/cache.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/object.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/handlers.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/socket.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/error.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/cache_mngt.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/hashtable.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/hash.c $(libnldir)
+	$(cp) thirdparty/libnl-3.11.0/lib/nl.c $(libnldir)
+
+	$(cp) -r thirdparty/libnl-3.11.0/include $(libnldir)
+
+	cp thirdparty/libnl-3.11.0/lib/nl-core.h $(libnldir)
+	# cp thirdparty/libnl-3.11.0/lib/hashtable-api.h $(libnldir)
+	cp thirdparty/libnl-3.11.0/lib/genl/nl-genl.h $(libnldir)
+	cp thirdparty/libnl-3.11.0/lib/mpls.h $(libnldir)
 
 	for i in $(mDNSdir)/*.patch; do python thirdparty/python_patch/patch.py $$i; done
 

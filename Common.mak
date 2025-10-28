@@ -130,7 +130,8 @@ objects_core = \
 	$(objdir)SignalHandlers.$(objext) \
 	$(objdir)Shell.$(objext) \
 	$(objdir)InfoProvider.$(objext) \
-	$(objdir)ShellCommandDebug.$(objext)
+	$(objdir)ShellCommandDebug.$(objext) \
+	$(extra_dependencies)
 
 
 # For simplicity, we make a list of all headers in the project and have all (core) source files depend on them
@@ -241,7 +242,6 @@ headers = \
 	$(inc_build)/OpenHome/Net/Core/DvResourceWriter.h \
 	$(inc_build)/OpenHome/Net/Core/DvServerUpnp.h \
 	$(inc_build)/OpenHome/Net/Core/FunctorCpDevice.h
-
 
 ohNetCore : make_obj_dir copy_build_includes patch_thirdparty_sources $(objects_core) $(objdir)$(libprefix)ohNetCore.$(libext)
 $(objdir)$(libprefix)ohNetCore.$(libext) : $(objects_core)
@@ -474,6 +474,45 @@ $(objdir)InfoProvider.$(objext) : OpenHome/Shell/InfoProvider.cpp $(headers)
 	$(compiler)InfoProvider.$(objext) -c $(cppflags) $(includes) OpenHome/Shell/InfoProvider.cpp
 $(objdir)ShellCommandDebug.$(objext) : OpenHome/Shell/ShellCommandDebug.cpp $(headers)
 	$(compiler)ShellCommandDebug.$(objext) -c $(cppflags) $(includes) OpenHome/Shell/ShellCommandDebug.cpp
+
+$(objdir)ctrl.$(objext) : $(libnldir)/ctrl.c $(headers)
+	$(compiler)ctrl.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/ctrl.c
+$(objdir)family.$(objext) : $(libnldir)/family.c $(headers)
+	$(compiler)family.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/family.c
+$(objdir)mngt.$(objext) : $(libnldir)/mngt.c $(headers)
+	$(compiler)mngt.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/mngt.c
+$(objdir)genl.$(objext) : $(libnldir)/genl.c $(headers)
+	$(compiler)genl.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/genl.c
+$(objdir)msg.$(objext) : $(libnldir)/msg.c $(headers)
+	$(compiler)msg.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/msg.c
+$(objdir)attr.$(objext) : $(libnldir)/attr.c $(headers)
+	$(compiler)attr.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/attr.c
+$(objdir)utils.$(objext) : $(libnldir)/utils.c $(headers)
+	$(compiler)utils.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/utils.c
+$(objdir)addr.$(objext) : $(libnldir)/addr.c $(headers)
+	$(compiler)addr.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/addr.c
+$(objdir)data.$(objext) : $(libnldir)/data.c $(headers)
+	$(compiler)data.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/data.c
+$(objdir)mpls.$(objext) : $(libnldir)/mpls.c $(headers)
+	$(compiler)mpls.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/mpls.c
+$(objdir)cache.$(objext) : $(libnldir)/cache.c $(headers)
+	$(compiler)cache.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/cache.c
+$(objdir)object.$(objext) : $(libnldir)/object.c $(headers)
+	$(compiler)object.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/object.c
+$(objdir)handlers.$(objext) : $(libnldir)/handlers.c $(headers)
+	$(compiler)handlers.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/handlers.c
+$(objdir)socket.$(objext) : $(libnldir)/socket.c $(headers)
+	$(compiler)socket.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/socket.c
+$(objdir)nl_error.$(objext) : $(libnldir)/error.c $(headers)
+	$(compiler)nl_error.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/error.c
+$(objdir)cache_mngt.$(objext) : $(libnldir)/cache_mngt.c $(headers)
+	$(compiler)cache_mngt.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/cache_mngt.c
+$(objdir)hashtable.$(objext) : $(libnldir)/hashtable.c $(headers)
+	$(compiler)hashtable.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/hashtable.c
+$(objdir)hash.$(objext) : $(libnldir)/hash.c $(headers)
+	$(compiler)hash.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/hash.c
+$(objdir)nl.$(objext) : $(libnldir)/nl.c $(headers)
+	$(compiler)nl.$(objext) -c $(cflags_third_party) $(includes) $(libnldir)/nl.c
 
 ohNetDllImpl: ohNetCore
 	$(link_dll) $(linkopts_ohNet) $(linkoutput)$(objdir)$(dllprefix)ohNet.$(dllext) $(objects_core)

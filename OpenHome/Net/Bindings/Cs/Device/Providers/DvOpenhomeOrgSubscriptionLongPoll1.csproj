@@ -4,7 +4,7 @@
         <AssemblyName>DvOpenhomeOrgSubscriptionLongPoll1.net</AssemblyName>    
 
         <TargetFrameworks>net8.0</TargetFrameworks>
-        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(TargetFrameworks);net8.0-ios</TargetFrameworks>
+        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(TargetFrameworks);net8.0-ios;net8.0-maccatalyst</TargetFrameworks>
 
         <EnableDefaultItems>False</EnableDefaultItems>
  
