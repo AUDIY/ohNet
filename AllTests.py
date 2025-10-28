@@ -206,7 +206,7 @@ gMacArm64 = 0
 giOsArm64 = 0
 giOsx64 = 0
 giOsArm64Sim = 0
-gMacArm64Catalyst
+gMacArm64Catalyst = 0
 gAndroid = 0
 try:
     gPlatform = os.environ['PLATFORM']
