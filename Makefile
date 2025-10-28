@@ -229,6 +229,12 @@ ifeq ($(platform),Mac)
         osbuilddir = Mac-x64
         openhome_architecture = x64
         dotnetRuntime = osx-x64
+    else ifeq ($(detected_openhome_architecture),arm64-catalyst)
+        mac_osx_arch = arm64
+        osbuilddir = Mac-arm64
+        openhome_architecture = arm64
+        dotnetRuntime = osx-arm64
+        dotnetFramework = net8.0-maccatalyst
     else
         mac_osx_arch = arm64
         osbuilddir = Mac-arm64
@@ -236,9 +242,6 @@ ifeq ($(platform),Mac)
         dotnetRuntime = osx-arm64
 	endif
 
-    ifeq ($(detected_openhome_architecture),arm64-catalyst)
-        dotnetFramework = net8.0-maccatalyst
-    endif
 
     platform_cflags = -DPLATFORM_MACOSX_GNU -arch $(mac_osx_arch) -mmacosx-version-min=11 -Wno-unused-command-line-argument
     platform_linkflags = -arch $(mac_osx_arch) -framework CoreFoundation -framework SystemConfiguration -framework IOKit
