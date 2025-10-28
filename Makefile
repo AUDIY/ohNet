@@ -53,15 +53,13 @@ ifeq ($(MACHINE),Darwin)
       platform = Linux
       detected_openhome_system = Linux
       detected_openhome_architecture = rpi
-  else ifeq($(Maccatalyst-arm64),1)
-      platform = Mac
-      detected_openhome_architecture = Mac
-      detected_openhome_architecture = arm64-catalyst
   else
     platform = Mac
     detected_openhome_system = Mac
     ifeq ($(Mac-x64),1)
         detected_openhome_architecture = x64
+    else ifeq($(Maccatalyst-arm64),1)
+        detected_openhome_architecture = arm64-catalyst
     else
         detected_openhome_architecture = arm64
     endif
