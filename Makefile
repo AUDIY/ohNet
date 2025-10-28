@@ -53,6 +53,10 @@ ifeq ($(MACHINE),Darwin)
       platform = Linux
       detected_openhome_system = Linux
       detected_openhome_architecture = rpi
+  else ifeq($(Maccatalyst-arm64),1)
+      platform = Mac
+      detected_openhome_architecture = Mac
+      detected_openhome_architecture = arm64-catalyst
   else
     platform = Mac
     detected_openhome_system = Mac
@@ -231,6 +235,9 @@ ifeq ($(platform),Mac)
         openhome_architecture = arm64
         dotnetRuntime = osx-arm64
 	endif
+
+    ifeq ($(detected_openhome_architecture),arm64-catalyst)
+        dotnetFramework = net8.0-maccatalyst
 
     platform_cflags = -DPLATFORM_MACOSX_GNU -arch $(mac_osx_arch) -mmacosx-version-min=11 -Wno-unused-command-line-argument
     platform_linkflags = -arch $(mac_osx_arch) -framework CoreFoundation -framework SystemConfiguration -framework IOKit
