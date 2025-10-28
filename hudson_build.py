@@ -158,6 +158,7 @@ class JenkinsBuild():
             'Macos-x64': { 'os': 'macos', 'arch': 'x86', 'publish': False, 'system': 'Mac'},  # Old Jenkins label
             'Mac-x64': { 'os': 'macos', 'arch': 'x64', 'publish': True, 'system': 'Mac'},     # New Jenkins label, matches downstream builds
             'Mac-arm64': { 'os': 'macos', 'arch': 'arm64', 'publish': True, 'system': 'Mac'},     # New Jenkins label, matches downstream builds
+            'Mac-arm64-maccatalyst': { 'os': 'macos', 'arch': 'arm64-catalyst', 'publish': True, 'system': 'Mac'},     # New Jenkins label, matches downstream builds
             'armhf-buildroot-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'buildroot'},
             'armhf-raspbian-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'raspbian'},
             'armhf-kirkstone-linux': { 'os': 'linux', 'arch': 'armhf', 'publish': True, 'system': 'Linux', 'distro': 'kirkstone'},
