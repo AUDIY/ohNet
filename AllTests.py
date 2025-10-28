@@ -255,7 +255,7 @@ for arg in sys.argv[1:]:
         if platform.system() != 'Darwin':
             print('ERROR - --mac-arm64 only applicable on Darwin')
             sys.exit(1)
-     elif arg == '--mac-arm64-maccatalyst':
+    elif arg == '--mac-arm64-maccatalyst':
         gMacArm64Catalyst = 1
         if platform.system() != 'Darwin':
             print('ERROR - --mac-arm64-catalyst only applicable on Darwin')
