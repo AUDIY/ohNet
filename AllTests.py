@@ -21,6 +21,8 @@ def objPath():
             plat = 'iOs-x64'
         elif giOsArm64Sim == 1:
             plat = 'iOs-arm64'
+        elif gMacArm64Catalyst:
+            plat = 'Mac-arm64'
     variant = 'Release'
     if gDebugBuild == 1:
         variant = 'Debug'
@@ -42,6 +44,8 @@ def buildArgs():
         buildArgs += ' iOs-x64=1'
     if giOsArm64Sim == 1:
         buildArgs += ' iOS-arm64-sim=1'
+    if gMacArm64Catalyst == 1:
+        buildArgs += 'Maccatalyst-arm64=1'
     if gAndroid == 1:
         buildArgs += ' Android-anycpu=1'
     if gCore == 1:
@@ -202,6 +206,7 @@ gMacArm64 = 0
 giOsArm64 = 0
 giOsx64 = 0
 giOsArm64Sim = 0
+gMacArm64Catalyst
 gAndroid = 0
 try:
     gPlatform = os.environ['PLATFORM']
@@ -249,6 +254,11 @@ for arg in sys.argv[1:]:
         gMacArm64 = 1
         if platform.system() != 'Darwin':
             print('ERROR - --mac-arm64 only applicable on Darwin')
+            sys.exit(1)
+     elif arg == '--mac-arm64-maccatalyst':
+        gMacArm64Catalyst = 1
+        if platform.system() != 'Darwin':
+            print('ERROR - --mac-arm64-catalyst only applicable on Darwin')
             sys.exit(1)
     elif arg == '--iOs-arm64':
         giOsArm64 = 1
