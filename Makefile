@@ -237,6 +237,7 @@ ifeq ($(platform),Mac)
 	endif
 
     ifeq ($(detected_openhome_architecture),arm64-catalyst)
+        osbuilddir = Mac-arm64-catalyst
         dotnetFramework = net8.0-maccatalyst
     endif
 
