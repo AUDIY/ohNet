@@ -238,6 +238,7 @@ ifeq ($(platform),Mac)
 
     ifeq ($(detected_openhome_architecture),arm64-catalyst)
         dotnetFramework = net8.0-maccatalyst
+    endif
 
     platform_cflags = -DPLATFORM_MACOSX_GNU -arch $(mac_osx_arch) -mmacosx-version-min=11 -Wno-unused-command-line-argument
     platform_linkflags = -arch $(mac_osx_arch) -framework CoreFoundation -framework SystemConfiguration -framework IOKit
