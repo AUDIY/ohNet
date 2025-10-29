@@ -9,7 +9,6 @@
     <EnableDefaultItems>False</EnableDefaultItems>
     <Platform>AnyCPU</Platform>
 
-    <!-- Required for Mac Catalyst -->
     <ApplicationId>uk.co.linn.ohNet.TestCpDeviceDvCs</ApplicationId>
   </PropertyGroup>
   
