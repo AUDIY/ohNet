@@ -45,7 +45,7 @@ def buildArgs():
     if giOsArm64Sim == 1:
         buildArgs += ' iOS-arm64-sim=1'
     if gMacArm64Catalyst == 1:
-        buildArgs += 'Maccatalyst-arm64=1'
+        buildArgs += ' Maccatalyst-arm64=1'
     if gAndroid == 1:
         buildArgs += ' Android-anycpu=1'
     if gCore == 1:
