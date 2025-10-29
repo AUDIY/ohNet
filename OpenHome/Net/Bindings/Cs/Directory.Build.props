@@ -5,13 +5,15 @@
     <ohNetGccFlags>-L$(ohnetDir) -lohNetCore -force_load $(ohnetDir)libohNet.dylib</ohNetGccFlags>
     <ohNetArgs>-cxx -gcc_flags "$(ohNetGccFlags)"</ohNetArgs>
   </PropertyGroup>
-  
   <!-- 
   If MtouchExtraArgs is set, we don't know if the gcc flags have already been specified.
   So, only set it if it is not already set. Any project that includes ohNet that sets MtouchEventArgs
   will need to include $(ohNetGccFlags) in the gcc flags.
   -->
   <PropertyGroup Condition=" '$(RuntimeIdentifier)' == 'maccatalyst-arm64' And '$(MtouchExtraArgs)' == '' ">
+    <MtouchLink>SdkOnly</MtouchLink>
+    <MtouchUseLlvm>true</MtouchUseLlvm>
+    <MtouchFloat32>true</MtouchFloat32>
     <MtouchExtraArgs>$(ohNetArgs)</MtouchExtraArgs>
   </PropertyGroup>
 </Project>
