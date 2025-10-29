@@ -58,7 +58,7 @@ ifeq ($(MACHINE),Darwin)
     detected_openhome_system = Mac
     ifeq ($(Mac-x64),1)
         detected_openhome_architecture = x64
-    else ifeq($(Maccatalyst-arm64),1)
+    else ifeq ($(Maccatalyst-arm64),1)
         detected_openhome_architecture = arm64-catalyst
     else
         detected_openhome_architecture = arm64
