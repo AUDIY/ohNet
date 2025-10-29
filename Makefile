@@ -164,6 +164,9 @@ dotnetRuntime = linux-x64
 #       are included for iOS builds. 
 dotnetFramework = net8.0
 
+# NOTE: MacCatalyst only: Doesn't allow us to ship a 
+dotnetPublishSingleFile = true
+
 ifeq ($(openhome_system),Linux)
 	dotnetsdk = ~/.dotnet/dotnet
 endif
@@ -231,8 +234,9 @@ ifeq ($(platform),Mac)
         mac_osx_arch = arm64
         osbuilddir = Mac-arm64
         openhome_architecture = arm64
-        dotnetRuntime = osx-arm64
+        dotnetRuntime = maccatalyst-arm64
         dotnetFramework = net8.0-maccatalyst
+        dotnetPublishSingleFile = false
     else
         mac_osx_arch = arm64
         osbuilddir = Mac-arm64
