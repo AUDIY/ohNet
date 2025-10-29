@@ -10,6 +10,9 @@
     <Platform>AnyCPU</Platform>
 
     <IntermediateOutputPath>../../obj</IntermediateOutputPath>
+
+    <!-- Required for Mac Catalyst -->
+    <ApplicationId>uk.co.linn.ohNet.TestPerformanceCpCs</ApplicationId>
   </PropertyGroup>
   
   <ItemGroup>

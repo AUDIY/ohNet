@@ -12,6 +12,9 @@
         <IntermediateOutputPath>../../obj</IntermediateOutputPath>
 
         <Platform>AnyCPU</Platform>
+
+        <!-- Required for Mac Catalyst -->
+        <ApplicationId>uk.co.linn.ohNet.UpnpOrgConnectionManager1</ApplicationId>
     </PropertyGroup>
 
     <ItemGroup>
