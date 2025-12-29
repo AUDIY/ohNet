@@ -23,7 +23,7 @@ link_libs = Ws2_32.lib Iphlpapi.lib Dbghelp.lib
 static_or_dynamic = /MT
 
 dotnetsdk = dotnet
-dotnetFramework = net6.0
+dotnetFramework = net8.0
 !if "$(openhome_architecture)"=="x64"
 dotnetRuntime = win-x64
 !else
@@ -103,6 +103,7 @@ installincludedir = $(installdir)\include
 mkdir = Scripts\mkdir.bat
 rmdir = Scripts\rmdir.bat
 uset4 = no
+extra_dependencies = 
 
 default : all
 

@@ -5,14 +5,17 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>OpenHome.Net</RootNamespace>
     
-    <TargetFrameworks>net6.0</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(TargetFrameworks);net6.0-ios</TargetFrameworks>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(TargetFrameworks);net8.0-ios;net8.0-maccatalyst</TargetFrameworks>
 
     <EnableDefaultItems>False</EnableDefaultItems>
 
     <Platform>AnyCPU</Platform>
 
     <IntermediateOutputPath>../../obj</IntermediateOutputPath>
+
+    <!-- Required for Mac Catalyst -->
+    <ApplicationId>uk.co.linn.ohNet.TestPerformanceDvCs</ApplicationId>
   </PropertyGroup>
   
   <ItemGroup>
